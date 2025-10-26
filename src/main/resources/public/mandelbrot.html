@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mandelbrot Fractal</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f0f0;
+        }
+        h1 {
+            color: #333;
+        }
+        body.dark {
+            background-color: black;
+            color: white;
+        }
+        body.dark h1 {
+            color: white;
+        }
+        #fractal-container {
+            position: relative;
+            cursor: crosshair;
+            border: 1px solid #ccc;
+        }
+        #selection-box {
+            position: absolute;
+            border: 1px dashed #fff;
+            background-color: rgba(255, 255, 255, 0.3);
+            display: none;
+        }
+        #controls {
+            margin-top: 10px;
+        }
+        #controls > * {
+            margin: 0 5px;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Mandelbrot Fractal</h1>
+<p>Click and drag on the image to zoom in. Click the "Reset" button to go back to the initial view.</p>
+
+<div id="fractal-container">
+    <img id="fractalImage" alt="Mandelbrot Fractal">
+    <div id="selection-box"></div>
+</div>
+
+<div id="controls">
+    <button id="resetButton">Reset</button>
+    <button id="undoButton" disabled>Undo</button>
+    <label for="paletteSelect">Palette:</label>
+    <select id="paletteSelect">
+        <option value="sol" selected>Sol</option>
+        <option value="sunrise">Sunrise</option>
+        <option value="dark">Dark</option>
+    </select>
+</div>
+
+<script>
+    const fractalImage = document.getElementById('fractalImage');
+    const container = document.getElementById('fractal-container');
+    const selectionBox = document.getElementById('selection-box');
+    const resetButton = document.getElementById('resetButton');
+    const undoButton = document.getElementById('undoButton');
+    const paletteSelect = document.getElementById('paletteSelect');
+
+    const width = 1000;
+    const height = 1000;
+    const palettes = Array.from(paletteSelect.options).map(o => o.value);
+    const defaultPalette = palettes[0];
+
+    let state = {
+        centerX: -0.5,
+        centerY: 0.0,
+        zoom: 1.0,
+        palette: defaultPalette
+    };
+
+    let history = [];
+    let isSelecting = false;
+    let startX, startY;
+
+    function setCookie(name, value, days) {
+        let expires = "";
+        if (days) {
+            const date = new Date();
+            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+            expires = "; expires=" + date.toUTCString();
+        }
+        document.cookie = name + "=" + (value || "") + expires + "; path=/";
+    }
+
+    function getCookie(name) {
+        const nameEQ = name + "=";
+        const ca = document.cookie.split(';');
+        for (let i = 0; i < ca.length; i++) {
+            let c = ca[i];
+            while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+            if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+        }
+        return null;
+    }
+
+    function updateImage() {
+        const { centerX, centerY, zoom, palette } = state;
+        console.log(`centerX=${centerX}, centerY=${centerY}, zoom=${zoom}, palette=${palette}`);
+        const imgSrc = `/mandelbrot/image?width=${width}&height=${height}&centerX=${centerX}&centerY=${centerY}&zoom=${zoom}&palette=${palette}`
+        console.log(`setting image src to ${imgSrc}`)
+        fractalImage.src = imgSrc;
+        setCookie("mandelbrotState", JSON.stringify(state), 7);
+    }
+
+    function resetState() {
+        let palette = defaultPalette;
+        const savedState = getCookie("mandelbrotState");
+        if (savedState) {
+            const parsed = JSON.parse(savedState);
+            if (parsed && parsed.palette) {
+                palette = parsed.palette;
+            }
+        }
+        state = {
+            centerX: -0.5,
+            centerY: 0.0,
+            zoom: 1.0,
+            palette: palette
+        };
+        history = [];
+        undoButton.disabled = true;
+        paletteSelect.value = palette;
+        if (palette === 'dark') {
+            document.body.classList.add('dark');
+        } else {
+            document.body.classList.remove('dark');
+        }
+        updateImage();
+    }
+
+    function undo() {
+        if (history.length > 0) {
+            state = history.pop();
+            if (state.palette === 'dark') {
+                document.body.classList.add('dark');
+            } else {
+                document.body.classList.remove('dark');
+            }
+            undoButton.disabled = history.length === 0;
+            updateImage();
+        }
+    }
+
+    function getMousePos(e) {
+        const rect = fractalImage.getBoundingClientRect();
+        return {
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top
+        };
+    }
+
+    fractalImage.addEventListener('mousedown', (e) => {
+        isSelecting = true;
+        const pos = getMousePos(e);
+        startX = pos.x;
+        startY = pos.y;
+        selectionBox.style.left = `${startX}px`;
+        selectionBox.style.top = `${startY}px`;
+        selectionBox.style.width = '1px';
+        selectionBox.style.height = '0px';
+        selectionBox.style.display = 'block';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isSelecting) return;
+
+        const pos = getMousePos(e);
+        const currentX = pos.x;
+        const currentY = pos.y;
+
+        const deltaX = currentX - startX;
+        const deltaY = currentY - startY;
+        const size = Math.max(Math.abs(deltaX), Math.abs(deltaY));
+
+        const boxX = deltaX < 0 ? startX - size : startX;
+        const boxY = deltaY < 0 ? startY - size : startY;
+
+        selectionBox.style.left = `${boxX}px`;
+        selectionBox.style.top = `${boxY}px`;
+        selectionBox.style.width = `${size}px`;
+        selectionBox.style.height = `${size}px`;
+    });
+
+    document.addEventListener('mouseup', (e) => {
+        if (!isSelecting) return;
+        isSelecting = false;
+        selectionBox.style.display = 'none';
+
+        const pos = getMousePos(e);
+        const deltaX = pos.x - startX;
+        const deltaY = pos.y - startY;
+        const size = Math.max(Math.abs(deltaX), Math.abs(deltaY));
+
+        const selectionWidth = size;
+
+        if (selectionWidth < 10) {
+            // Ignore very small selections
+            return;
+        }
+
+        history.push({ ...state });
+        undoButton.disabled = false;
+
+        const rangeX = 4.0 / state.zoom;
+        const rangeY = 4.0 / state.zoom;
+
+        const boxStartX = deltaX < 0 ? startX - size : startX;
+        const boxStartY = deltaY < 0 ? startY - size : startY;
+
+        // New center in complex plane
+        const newCenterX = state.centerX + (boxStartX + size / 2 - width / 2) * rangeX / width;
+        const newCenterY = state.centerY + (boxStartY + size / 2 - height / 2) * rangeY / height;
+
+        // New zoom level
+        const newZoom = state.zoom * (width / selectionWidth);
+
+        state.centerX = newCenterX;
+        state.centerY = newCenterY;
+        state.zoom = newZoom;
+
+        updateImage();
+    });
+
+    resetButton.addEventListener('click', resetState);
+    undoButton.addEventListener('click', undo);
+    paletteSelect.addEventListener('change', (e) => {
+        history.push({ ...state });
+        undoButton.disabled = false;
+        state.palette = e.target.value;
+        if (state.palette === 'dark') {
+            document.body.classList.add('dark');
+        } else {
+            document.body.classList.remove('dark');
+        }
+        updateImage();
+    });
+
+    // Initial load
+    const savedState = getCookie("mandelbrotState");
+    if (savedState) {
+        state = JSON.parse(savedState);
+        if (!state.palette || !palettes.includes(state.palette)) {
+            state.palette = defaultPalette;
+        }
+        history = [];
+        undoButton.disabled = true;
+        paletteSelect.value = state.palette;
+        if (state.palette === 'dark') {
+            document.body.classList.add('dark');
+        } else {
+            document.body.classList.remove('dark');
+        }
+    }
+    updateImage();
+</script>
+</body>
+</html>

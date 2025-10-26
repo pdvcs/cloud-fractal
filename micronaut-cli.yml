@@ -1,0 +1,6 @@
+applicationType: default
+defaultPackage: net.pdutta.cloudfractal
+testFramework: junit
+sourceLanguage: kotlin
+buildTool: maven
+features: [app-name, http-client-test, junit, kapt, kotlin, kotlin-application, logback, maven, maven-enforcer-plugin, micronaut-aot, micronaut-http-validation, netty-server, properties, readme, serialization-jackson, shade, static-resources]

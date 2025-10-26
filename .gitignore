@@ -1,0 +1,35 @@
+# builds
+build/
+target/
+out/
+
+# fx
+.micronaut/
+
+# IDE cruft
+.vscode/
+.idea/
+*.iml
+*.ipr
+*.iws
+.project
+.settings
+.classpath
+.factorypath
+
+# Maven cruft
+.mvn/
+mvnw
+mvnw.cmd
+mvnw.bat
+
+# Gradle cruft
+.gradle
+
+# OS cruft
+.DS_Store
+Thumbs.db
+Icon*
+*.bak
+*.tmp
+*~

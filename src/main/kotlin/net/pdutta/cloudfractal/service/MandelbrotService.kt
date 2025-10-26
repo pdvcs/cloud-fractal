@@ -46,32 +46,32 @@ class MandelbrotService {
     private suspend fun generateWithCoroutines(params: FractalParameters): BufferedImage =
         withContext(computationDispatcher) {
             val image = BufferedImage(params.width, params.height, BufferedImage.TYPE_INT_RGB)
-            val rangeX = 4.0 / params.zoom
-            val rangeY = 4.0 / params.zoom
 
             // Process rows in parallel using coroutines
-            // Each row is processed as a separate coroutine
-            (0 until params.height).map { y ->
+            // Each coroutine calculates a row and returns the pixel data for that row.
+            val rowJobs: List<Deferred<Pair<Int, IntArray>>> = (0 until params.height).map { y ->
                 async {
-                    processRow(y, image, params, rangeX, rangeY)
+                    y to processRow(y, params)
                 }
-            }.awaitAll()
+            }
+
+            // Wait for all rows to be calculated and then write them to the image
+            rowJobs.awaitAll().forEach { (y, pixelData) ->
+                image.setRGB(0, y, params.width, 1, pixelData, 0, params.width)
+            }
 
             image
         }
 
-    private fun processRow(
-        y: Int,
-        image: BufferedImage,
-        params: FractalParameters,
-        rangeX: Double,
-        rangeY: Double
-    ) {
+    private fun processRow(y: Int, params: FractalParameters): IntArray {
+        val rangeX = 4.0 / params.zoom
+        val rangeY = 4.0 / params.zoom
+        val rowPixels = IntArray(params.width)
         for (x in 0 until params.width) {
             val iterations = calculateIterations(x, y, params, rangeX, rangeY)
-            val color = getColor(iterations, params.maxIterations, params.palette)
-            image.setRGB(x, y, color)
+            rowPixels[x] = getColor(iterations, params.maxIterations, params.palette)
         }
+        return rowPixels
     }
 
     private fun calculateIterations(

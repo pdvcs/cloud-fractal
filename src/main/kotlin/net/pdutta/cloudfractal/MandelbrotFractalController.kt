@@ -47,8 +47,16 @@ class MandelbrotFractalController(
             zoom = zoom,
             palette = colorScheme
         )
+        // The hashCode serves as an ETag based on the fractal parameters,
+        // this helps cache the image
+        val etag = "\"${params.hashCode()}\""
 
         val image = mandelbrotService.generateFractal(params)
         return HttpResponse.ok(imageEncoder.encodeToPng(image))
+            .header("ETag", etag)
+            .header(
+                "Cache-Control",
+                "public, max-age=31536000, immutable"
+            )
     }
 }

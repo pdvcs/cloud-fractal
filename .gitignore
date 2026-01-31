@@ -6,6 +6,10 @@ out/
 # fx
 .micronaut/
 
+# LLMs
+.claude/
+CLAUDE.md
+
 # IDE cruft
 .vscode/
 .idea/

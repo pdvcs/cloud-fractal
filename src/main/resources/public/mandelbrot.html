@@ -2,270 +2,77 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="theme-color" content="#f0f0f0" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
     <title>Mandelbrot Fractal</title>
-    <style>
-        body {
-            font-family: sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            background-color: #f0f0f0;
-        }
-        h1 {
-            color: #333;
-        }
-        body.dark {
-            background-color: black;
-            color: white;
-        }
-        body.dark h1 {
-            color: white;
-        }
-        #fractal-container {
-            position: relative;
-            cursor: crosshair;
-            border: 1px solid #ccc;
-        }
-        #selection-box {
-            position: absolute;
-            border: 1px dashed #fff;
-            background-color: rgba(255, 255, 255, 0.3);
-            display: none;
-        }
-        #controls {
-            margin-top: 10px;
-        }
-        #controls > * {
-            margin: 0 5px;
-            vertical-align: middle;
-        }
-    </style>
+    <link rel="stylesheet" href="/assets/mandelbrot.css">
 </head>
 <body>
 
+<!-- Header -->
 <h1>Mandelbrot Fractal</h1>
-<p>Click and drag on the image to zoom in. Click the "Reset" button to go back to the initial view.</p>
+<p>Drag to zoom • Shift+drag to pan • Two-finger pinch/pan on mobile</p>
 
+<!-- Fractal Display Container -->
 <div id="fractal-container">
     <img id="fractalImage" alt="Mandelbrot Fractal">
     <div id="selection-box"></div>
+    <div id="loading-indicator">Loading...</div>
 </div>
 
+<!-- Control Bar -->
 <div id="controls">
     <button id="resetButton">Reset</button>
     <button id="undoButton" disabled>Undo</button>
-    <label for="paletteSelect">Palette:</label>
+    <button id="panModeButton" class="mode-button">Pan</button>
+    <label for="paletteSelect" class="palette-label">Palette:</label>
     <select id="paletteSelect">
         <option value="sol" selected>Sol</option>
         <option value="sunrise">Sunrise</option>
         <option value="dark">Dark</option>
     </select>
+    <button id="helpButton">?</button>
 </div>
 
-<script>
-    const fractalImage = document.getElementById('fractalImage');
-    const container = document.getElementById('fractal-container');
-    const selectionBox = document.getElementById('selection-box');
-    const resetButton = document.getElementById('resetButton');
-    const undoButton = document.getElementById('undoButton');
-    const paletteSelect = document.getElementById('paletteSelect');
+<!-- Help Overlay -->
+<div id="help-overlay" class="help-overlay">
+    <div class="help-content">
+        <button class="help-close">&times;</button>
+        <h2>How to Explore</h2>
 
-    const width = 1000;
-    const height = 1000;
-    const palettes = Array.from(paletteSelect.options).map(o => o.value);
-    const defaultPalette = palettes[0];
+        <details class="help-section" id="desktop-controls" open>
+            <summary>Desktop Controls</summary>
+            <ul>
+                <li><strong>Zoom In:</strong> Click and drag to create a selection box, then release to zoom into that area</li>
+                <li><strong>Pan:</strong> Hold Shift and drag, or right-click and drag to move around</li>
+                <li><strong>Alternative:</strong> Click "Pan" button to toggle between zoom and pan modes</li>
+                <li><strong>Undo:</strong> Click Undo to go back to the previous view</li>
+                <li><strong>Reset:</strong> Return to the initial view</li>
+            </ul>
+        </details>
 
-    let state = {
-        centerX: -0.5,
-        centerY: 0.0,
-        zoom: 1.0,
-        palette: defaultPalette
-    };
+        <details class="help-section" id="mobile-controls">
+            <summary>Mobile Controls</summary>
+            <ul>
+                <li><strong>Pinch Zoom:</strong> Use two fingers to pinch in/out to zoom</li>
+                <li><strong>Two-Finger Pan:</strong> Keep two fingers same distance apart and drag to move around</li>
+                <li><strong>Zoom Selection:</strong> Drag with one finger to create a selection box</li>
+                <li><strong>Pan Mode:</strong> Enable "Pan" button to pan with one finger instead of zooming</li>
+            </ul>
+        </details>
 
-    let history = [];
-    let isSelecting = false;
-    let startX, startY;
+        <details class="help-section" id="color-palettes">
+            <summary>Color Palettes</summary>
+            <ul>
+                <li><strong>Sol:</strong> Vibrant, fast-cycling colors</li>
+                <li><strong>Sunrise:</strong> Warm, gentle gradients</li>
+                <li><strong>Dark:</strong> Dark theme with subtle colors</li>
+            </ul>
+        </details>
+    </div>
+</div>
 
-    function setCookie(name, value, days) {
-        let expires = "";
-        if (days) {
-            const date = new Date();
-            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-            expires = "; expires=" + date.toUTCString();
-        }
-        document.cookie = name + "=" + (value || "") + expires + "; path=/";
-    }
-
-    function getCookie(name) {
-        const nameEQ = name + "=";
-        const ca = document.cookie.split(';');
-        for (let i = 0; i < ca.length; i++) {
-            let c = ca[i];
-            while (c.charAt(0) === ' ') c = c.substring(1, c.length);
-            if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
-        }
-        return null;
-    }
-
-    function updateImage() {
-        const { centerX, centerY, zoom, palette } = state;
-        console.log(`centerX=${centerX}, centerY=${centerY}, zoom=${zoom}, palette=${palette}`);
-        const imgSrc = `/mandelbrot/image?width=${width}&height=${height}&centerX=${centerX}&centerY=${centerY}&zoom=${zoom}&palette=${palette}`
-        console.log(`setting image src to ${imgSrc}`)
-        fractalImage.src = imgSrc;
-        setCookie("mandelbrotState", JSON.stringify(state), 7);
-    }
-
-    function resetState() {
-        let palette = defaultPalette;
-        const savedState = getCookie("mandelbrotState");
-        if (savedState) {
-            const parsed = JSON.parse(savedState);
-            if (parsed && parsed.palette) {
-                palette = parsed.palette;
-            }
-        }
-        state = {
-            centerX: -0.5,
-            centerY: 0.0,
-            zoom: 1.0,
-            palette: palette
-        };
-        history = [];
-        undoButton.disabled = true;
-        paletteSelect.value = palette;
-        if (palette === 'dark') {
-            document.body.classList.add('dark');
-        } else {
-            document.body.classList.remove('dark');
-        }
-        updateImage();
-    }
-
-    function undo() {
-        if (history.length > 0) {
-            state = history.pop();
-            if (state.palette === 'dark') {
-                document.body.classList.add('dark');
-            } else {
-                document.body.classList.remove('dark');
-            }
-            undoButton.disabled = history.length === 0;
-            updateImage();
-        }
-    }
-
-    function getMousePos(e) {
-        const rect = fractalImage.getBoundingClientRect();
-        return {
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top
-        };
-    }
-
-    fractalImage.addEventListener('mousedown', (e) => {
-        isSelecting = true;
-        const pos = getMousePos(e);
-        startX = pos.x;
-        startY = pos.y;
-        selectionBox.style.left = `${startX}px`;
-        selectionBox.style.top = `${startY}px`;
-        selectionBox.style.width = '1px';
-        selectionBox.style.height = '0px';
-        selectionBox.style.display = 'block';
-    });
-
-    document.addEventListener('mousemove', (e) => {
-        if (!isSelecting) return;
-
-        const pos = getMousePos(e);
-        const currentX = pos.x;
-        const currentY = pos.y;
-
-        const deltaX = currentX - startX;
-        const deltaY = currentY - startY;
-        const size = Math.max(Math.abs(deltaX), Math.abs(deltaY));
-
-        const boxX = deltaX < 0 ? startX - size : startX;
-        const boxY = deltaY < 0 ? startY - size : startY;
-
-        selectionBox.style.left = `${boxX}px`;
-        selectionBox.style.top = `${boxY}px`;
-        selectionBox.style.width = `${size}px`;
-        selectionBox.style.height = `${size}px`;
-    });
-
-    document.addEventListener('mouseup', (e) => {
-        if (!isSelecting) return;
-        isSelecting = false;
-        selectionBox.style.display = 'none';
-
-        const pos = getMousePos(e);
-        const deltaX = pos.x - startX;
-        const deltaY = pos.y - startY;
-        const size = Math.max(Math.abs(deltaX), Math.abs(deltaY));
-
-        const selectionWidth = size;
-
-        if (selectionWidth < 10) {
-            // Ignore very small selections
-            return;
-        }
-
-        history.push({ ...state });
-        undoButton.disabled = false;
-
-        const rangeX = 4.0 / state.zoom;
-        const rangeY = 4.0 / state.zoom;
-
-        const boxStartX = deltaX < 0 ? startX - size : startX;
-        const boxStartY = deltaY < 0 ? startY - size : startY;
-
-        // New center in complex plane
-        const newCenterX = state.centerX + (boxStartX + size / 2 - width / 2) * rangeX / width;
-        const newCenterY = state.centerY + (boxStartY + size / 2 - height / 2) * rangeY / height;
-
-        // New zoom level
-        const newZoom = state.zoom * (width / selectionWidth);
-
-        state.centerX = newCenterX;
-        state.centerY = newCenterY;
-        state.zoom = newZoom;
-
-        updateImage();
-    });
-
-    resetButton.addEventListener('click', resetState);
-    undoButton.addEventListener('click', undo);
-    paletteSelect.addEventListener('change', (e) => {
-        history.push({ ...state });
-        undoButton.disabled = false;
-        state.palette = e.target.value;
-        if (state.palette === 'dark') {
-            document.body.classList.add('dark');
-        } else {
-            document.body.classList.remove('dark');
-        }
-        updateImage();
-    });
-
-    // Initial load
-    const savedState = getCookie("mandelbrotState");
-    if (savedState) {
-        state = JSON.parse(savedState);
-        if (!state.palette || !palettes.includes(state.palette)) {
-            state.palette = defaultPalette;
-        }
-        history = [];
-        undoButton.disabled = true;
-        paletteSelect.value = state.palette;
-        if (state.palette === 'dark') {
-            document.body.classList.add('dark');
-        } else {
-            document.body.classList.remove('dark');
-        }
-    }
-    updateImage();
-</script>
+<script src="/assets/mandelbrot.js"></script>
 </body>
 </html>

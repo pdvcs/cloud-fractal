@@ -65,7 +65,7 @@ class MandelbrotService {
 
     private fun processRow(y: Int, params: FractalParameters): IntArray {
         val rangeX = 4.0 / params.zoom
-        val rangeY = 4.0 / params.zoom
+        val rangeY = 4.0 * (params.height.toDouble() / params.width.toDouble()) / params.zoom
         val rowPixels = IntArray(params.width)
         for (x in 0 until params.width) {
             val iterations = calculateIterations(x, y, params, rangeX, rangeY)
